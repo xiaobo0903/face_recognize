@@ -1,0 +1,15 @@
+<html>
+  <head>
+    {% if title %}
+    <title>{{title}} - microblog</title>
+    {% else %}
+    <title>microblog</title>
+    {% endif %}
+  </head>
+  <body>
+    {% for face in faces %}
+    <p>{{face.name}}</p>
+    <img src="data:image/png;base64,{{face.img}}" />
+    {% endfor %}
+  </body>
+</html>

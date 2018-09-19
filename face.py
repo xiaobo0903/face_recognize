@@ -26,7 +26,7 @@ def recignize():
     	return jsonify({'t': p})
 
     imgurl = urllib.unquote(p)
-    ret = face_recognize.faceRecognize(imgurl, "recognize")  
+    ret = face_recognize.faceRecognize(imgurl)  
     return jsonify(ret)
 
 @app.route('/face/registe', methods=['post','get'])

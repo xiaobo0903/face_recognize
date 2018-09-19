@@ -8,13 +8,16 @@ import os
 import sys
 import gridfs
 import datetime
-import glob2 as gb
+#import glob2 as gb
 import json
 import time
 from skimage import io
 from pymongo import MongoClient
 import ConfigParser
 from cStringIO import StringIO
+import numpy as np
+from PIL import Image
+import base64
 
 class face_recognize:
 
@@ -76,20 +79,14 @@ class face_recognize:
 
 	for r in result:
 
-            im = r.read()
-            sf = r.name.split("_")
-
-            fname = "/mnt/"+r.name
-            output = open(fname, 'wb')
-            output.write(im)
-            output.close()
-
-            someone_img = face_recognition.load_image_file(fname)
-            someone_face_encoding = face_recognition.face_encodings(someone_img)[0]
+	    sf = r.name.split("_")
+            img_str = r.read()
+            nparr = np.fromstring(img_str, np.uint8)
+            image = cv2.imdecode(nparr, cv2.COLOR_BGR2GRAY)
+            someone_img = face_recognition.face_locations(image)
+            someone_face_encoding = face_recognition.face_encodings(image, someone_img)[0] 
             self.known_face_names.append(sf[2])
-            #print sf[2]
             self.known_face_encodings.append(someone_face_encoding) 
-            os.remove(fname)
 
     #对于新加入库中的人脸进行加载
 
@@ -102,27 +99,21 @@ class face_recognize:
 	imgfs = gridfs.GridFS(self.db)
 
         nfilename = filename.replace("unknown", "known")
-        nfilename = nfilename.replace("recognize", facename) 
+        nfilename = nfilename.replace("none", facename) 
 	sql = {"filename": nfilename}
 
         result = imgfs.find(sql)
 
 	for r in result:
 
-            im = r.read()
+            img_str = r.read()
             sf = r.name.split("_")
-
-            fname = "/mnt/"+r.name
-            output = open(fname, 'wb')
-            output.write(im)
-            output.close()
-
-            someone_img = face_recognition.load_image_file(fname)
-            someone_face_encoding = face_recognition.face_encodings(someone_img)[0]
+	    nparr = np.fromstring(img_str, np.uint8)
+            image = cv2.imdecode(nparr, cv2.COLOR_BGR2GRAY)
+            someone_img = face_recognition.face_locations(image)
+            someone_face_encoding = face_recognition.face_encodings(image, someone_img)[0] 
             self.known_face_names.append(sf[2])
-            #print sf[2]
             self.known_face_encodings.append(someone_face_encoding) 
-            os.remove(fname)
             break
 
     def getImage(self, imgurl):      
@@ -145,7 +136,7 @@ class face_recognize:
         return faces
 
     #对于图像中的提取的人脸与库中的标本进行处理；   
-    def saveUnknownFace(self, faces, imagename):
+    def saveUnknownFace(self, faces):
 
         if len(faces) == 0:
             return
@@ -159,15 +150,11 @@ class face_recognize:
 
         for face in faces:
 	    try: 
-                fname = "unknown_"+self.mycode+"_"+imagename+"_"+str(self.getTimeStamp())+".jpg"
-                fpath = "/mnt/"+fname
-	        cv2.imwrite(fpath, face)
-	        datatmp=open(fpath,'rb')
-                data=StringIO(datatmp.read())
+                fname = "unknown_"+self.mycode+"_none_"+str(self.getTimeStamp())+".jpg"
+                img_encode = cv2.imencode('.jpg', face)[1]
+                data_encode = np.array(img_encode)
+                data = data_encode.tostring()
                 imgfs.put(data, content_type = "jpg", filename =fname)
-                datatmp.close()
-	        #os.remove(fpath)
-                #print "save into db:"+fname
             except Exception as e:
                 print e
 
@@ -177,23 +164,23 @@ class face_recognize:
         return millis
 
     #对于图像中的提取的人脸与库中的标本进行处理；   
-    def recognize(self, image, faces, imagename):
+    def recognize(self, image, faces):
 
-        #print("Found {0} faces!".format(len(faces))) 
         mm = 0
-
         unmatch = []
         match_face = {}
         mint = 0
+        imgBase64 = []
 
         for (x, y, w, h) in faces:
 
-            #image1 = image[y:y+h, x:x+w]
-            #cropImg = cv2.resize(image1,(50,50),interpolation=cv2.INTER_CUBIC)
             cropImg = image[y:y+h, x:x+w]
             rgb_small_frame=cropImg[:,:,::-1]
-            #cv2.imwrite(str(mm)+".jpg", cropImg)
-            #print mm
+
+            img_encode = cv2.imencode('.jpg', rgb_small_frame)[1]
+            data_encode = np.array(img_encode)
+            str_encode = data_encode.tostring()
+            imgBase64.append(base64.b64encode(str_encode))
             mm = mm+1
 
             face_locations = face_recognition.face_locations(rgb_small_frame)
@@ -208,48 +195,39 @@ class face_recognize:
 
                 if True in match:
                     match_index=match.index(True)
+                    print ("find face:"+self.known_face_names[match_index]+':'+str(cute_clock))
+                    print "recognize face: [ "+self.known_face_names[match_index] +" ]"
                     name = "match"
-                    #print match_index
-                #To print name and time
-                    #print ("find face:"+self.known_face_names[match_index]+':'+str(cute_clock))
-                    #print "recognize face: [ "+self.known_face_names[match_index] +" ]"
                     match_face[str(mint)] = self.known_face_names[match_index]
-                    print match_face
                     mint = mint + 1
                 else:
                     unmatch.append(cropImg)   
-        self.saveUnknownFace(unmatch, imagename)
+        self.saveUnknownFace(unmatch)
 
         if match_face == {}:
-            return "{'status':'-4', 'info':'not found face!'}"
+            return "{'status':'-4', 'info':'Find "+str(len(faces))+" face, but know 0'}"
         else:
             
-            return "{'statuc':'1', 'info':'found face', 'recognize':["+json.dumps(match_face)+"]}"
+            return "{'statuc':'1', 'info':'Find "+str(len(faces))+" face', 'recognize':["+json.dumps(match_face)+"]}"
         
 
     #人像识别的主入口程序
-    def faceRecognize(self, imgurl, imagename):
+    def faceRecognize(self, imgurl):
 
-	try:
-            image = self.getImage(imgurl)
-	except:
-	    return "{'status':'-1', 'info':'get image error!'}"
-        try:
-            faces = self.getFace(image)
+        image = self.getImage(imgurl)
 
-            if len(faces) == 0:
-                return "{'status':'-2', 'info':'not found face!'}" 
-        except:
-	    return "{'status':'-2', 'info':'not found face!'}"            
-      
-        try:
-            return self.recognize(image, faces, imagename)
-            
-        except:
-            return "{'status':'-3', 'info':'not found face!'}" 
+        if image == None
+            return "{'status':'-1', 'info':'get Image Error!'}"
+
+        faces = self.getFace(image)
+
+        if len(faces) == 0:
+           return "{'status':'-2', 'info':'not found face!'}" 
+
+        return self.recognize(image, faces)
 
 if __name__== '__main__': 
 
     face_recognize = face_recognize(sys.argv[2])
-    ret = face_recognize.faceRecognize(sys.argv[1], sys.argv[3])
+    ret = face_recognize.faceRecognize(sys.argv[1])
 

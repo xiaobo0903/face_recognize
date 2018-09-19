@@ -47,7 +47,7 @@ class face_registe:
         collactionname = "fs.files" 
         collection = self.db[collactionname]
 	nfilename = filename.replace("unknown", "known")
-        nfilename = nfilename.replace("recognize", facename)
+        nfilename = nfilename.replace("none", facename)
 	
         result = collection.update({"filename": filename}, {"$set":{"filename": nfilename}}) 
 

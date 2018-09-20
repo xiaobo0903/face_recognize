@@ -168,7 +168,7 @@ class face_recognize:
 
         mm = 0
         unmatch = []
-        match_face = {}
+        match_face = [] 
         mint = 0
         imgBase64 = []
 
@@ -198,17 +198,15 @@ class face_recognize:
                     print ("find face:"+self.known_face_names[match_index]+':'+str(cute_clock))
                     print "recognize face: [ "+self.known_face_names[match_index] +" ]"
                     name = "match"
-                    match_face[str(mint)] = self.known_face_names[match_index]
+                    mface = {}
+                    mface["face"] = self.known_face_names[match_index] 
+                    match_face.append(mface)
                     mint = mint + 1
                 else:
                     unmatch.append(cropImg)   
         self.saveUnknownFace(unmatch)
 
-        if match_face == {}:
-            return "{'status':'-4', 'info':'Find "+str(len(faces))+" face, but know 0'}"
-        else:
-            
-            return "{'statuc':'1', 'info':'Find "+str(len(faces))+" face', 'recognize':["+json.dumps(match_face)+"]}"
+        return "{\"status\":1, \"faces\":"+str(len(faces))+", \"recognize\": "+str(mint)+", \"identify\":"+json.dumps(match_face)+", \"info\":\"Find "+str(len(faces))+" face\"}"
         
 
     #人像识别的主入口程序
@@ -216,13 +214,12 @@ class face_recognize:
 
         image = self.getImage(imgurl)
 
-        if image == None
-            return "{'status':'-1', 'info':'get Image Error!'}"
+        if image == None:
+            return "{\"status\":-1, \"faces\":0, \"recognize\": 0, \"identify\":[], \"info\": \"Get Image Error! \"}"
 
         faces = self.getFace(image)
-
         if len(faces) == 0:
-           return "{'status':'-2', 'info':'not found face!'}" 
+            return "{\"status\":1, \"faces\":0, \"recognize\": 0, \"identify\":[], \"info\": \"no face\"}"
 
         return self.recognize(image, faces)
 

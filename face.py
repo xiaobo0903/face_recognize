@@ -44,16 +44,27 @@ def registe():
     face_recognize.joinNewFaces(filename, name)
     return jsonify(ret)
 
-@app.route('/face/getfaces', methods=['post','get'])
-def getfaces():
+@app.route('/face/getknownfaces', methods=['post','get'])
+def getknownfaces():
 
     page = request.args.get("page")
     if page == None:
     	page = 0
-    ret = gfaces.getFaceList(int(page))  
+    ret = gfaces.getFaceList(int(page), 1)  
     return render_template("facelist.html",
         title = 'Home',
         faces = json.loads(ret))
+
+@app.route('/face/getunknownfaces', methods=['post','get'])
+def getunknownfaces():
+
+    page = request.args.get("page")
+    if page == None:
+        page = 0
+    ret = gfaces.getFaceList(int(page), 0)
+    return render_template("facelist.html",
+        title = 'Home',
+        faces = json.loads(ret)) 
 
 @app.errorhandler(404)
 def not_found(error):

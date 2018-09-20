@@ -8,7 +8,7 @@
   </head>
   <body>
     {% for face in faces %}
-    <p>{{face.name}}</p>
+    <p>[ {{face.date}} ]&nbsp;&nbsp;{{face.name}}</p>
     <img src="data:image/png;base64,{{face.img}}" />
     {% endfor %}
   </body>

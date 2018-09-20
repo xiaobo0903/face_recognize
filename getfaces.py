@@ -44,13 +44,19 @@ class getfaces:
 
     #由数据库来导入已知人像库的数据,根据mycode来导入本单位的人脸库，格式是:known_mycode_名称_时间戳.jpg；
 
-    def getFaceList(self, page):
+    def getFaceList(self, page, flag):
 
         if self.db == None:
             self.db = self.connect()
             #print("connect to mongodb...")   
 
-        regexstr = "_"+self.mycode+"_"
+        regexstr = ""
+
+        if flag == 1:
+           regexstr = "^known_"+self.mycode+"_"
+        else:
+           regexstr = "^unknown_"+self.mycode+"_"
+
         sql = {"filename": {"$regex": regexstr}} 
 
         imgfs = gridfs.GridFS(self.db)
@@ -64,7 +70,7 @@ class getfaces:
 	    dic = {}
 	    ls_f=base64.b64encode(r.read())
             dic["name"] = r.name
-            #dic["uploadDate"] = r.upload_date
+            dic["date"] = r.upload_date.strftime("%Y-%m-%d %H:%M:%S")
             dic["img"] = ls_f
 
             if stmp == "":
